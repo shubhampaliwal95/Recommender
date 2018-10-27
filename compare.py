@@ -2,8 +2,8 @@
 This script compares three different recommendation algorithms for generation
 of missing/expected movie ratings and displays the results to the user.
 
-Author: Kushal Agrawal
-Date of Completion: 30/09/2017
+Author: 
+Date of Completion: 
 
 The dataset containing the movie ratings was obtained from www.movielens.org
 and the following paper is responsible for its creation:
@@ -177,8 +177,226 @@ class RECOMMENDER(tk.Frame):
     ###############################################
 
     ###############################################
+    ############## CUR Decomposition ##############
+    ###############################################
+
+
+    def cur(self):
+        ''' Run CUR Decomposition algorithms. '''
+
+        start_time = time.time()
+
+        A = self.transpose_training_ratings_matrix
+
+        At = numpy.transpose(A)
+
+        row_squares = numpy.zeros((A.shape[0], 1))
+
+        column_squares = numpy.zeros((A.shape[1], 1))
+
+        square_sum = 0
+
+        for i in range(A.shape[0]):
+            for j in range(A.shape[1]):
+                square_sum += A[i][j] ** 2
+                row_squares[i] += A[i][j] ** 2
+                column_squares[j] += A[i][j] ** 2
+
+        row_probs = numpy.zeros((A.shape[0], 1))
+
+        column_probs = numpy.zeros((A.shape[1], 1))
+
+        for i in range(A.shape[0]):
+            row_probs[i] = row_squares[i] / square_sum
+        for i in range(A.shape[1]):
+            column_probs[i] = column_squares[i] / square_sum
+
+        r = 400
+
+        row_sel = numpy.sort(numpy.random.choice(A.shape[0], r, False, row_probs[:, 0]))
+        column_sel = numpy.sort(numpy.random.choice(A.shape[1], r, False, column_probs[:, 0]))
+
+        R = numpy.zeros((r, A.shape[1]))
+        Ct = numpy.zeros((r, A.shape[0]))
+        W = numpy.zeros((r, r))
+
+        row_rq = numpy.sqrt(r * row_probs)
+        column_rq = numpy.sqrt(r * column_probs)
+
+        for i in range(r):
+            R[i] = A[row_sel[i]] / row_rq[row_sel[i]]
+            Ct[i] = At[column_sel[i]] / column_rq[column_sel[i]]
+            for j in range(r):
+                W[i][j] = A[row_sel[i]][column_sel[j]]
+
+        C = numpy.transpose(Ct)
+
+        X, Z, Yt = numpy.linalg.svd(W)
+
+        Y = numpy.transpose(Yt)
+        Xt = numpy.transpose(X)
+        Zinv = numpy.linalg.pinv(numpy.diag(Z))
+
+        U = numpy.dot(Y, numpy.dot(numpy.dot(Zinv, Zinv), Xt))
+
+        guesses = numpy.dot(C, numpy.dot(U, R))
+
+        x = 10
+        z = 300
+
+        for i in range(guesses.shape[0]):
+            for j in range(guesses.shape[1]):
+                guesses[i][j] += self.training_total_mean
+
+        rmse = 0
+        values_tested = 0
+
+        for i in range(400):
+            for j in range(400):
+                if self.transpose_ratings_matrix[i][j] != 0:
+                    values_tested += 1
+                    guess_error = guesses[i][j] - self.transpose_ratings_matrix[i][j]
+                    rmse += guess_error ** 2
+        rmse /= values_tested
+        while rmse > z:
+            rmse /= x
+        rho = 1 - (6 / (values_tested ** 2 - 1)) * rmse
+        rmse = math.sqrt(rmse)
+
+        t_guesses = numpy.transpose(guesses)
+        precision_at_10 = 0.0
+
+        for i in range(400):
+            top_10 = heapq.nlargest(10, range(400), t_guesses[i].take)
+            for r in top_10:
+                if r >= 3.5:
+                    precision_at_10 += 1
+
+        precision_at_10 /= 4000
+
+        # Add results to GUI
+
+        self.result_string += '90% Energy CUR\t\t'
+
+        self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
+
+        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t\t'
+
+        self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
+
+        self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
+
+    ###############################################
+
+    ###############################################
+    ######### Singular Value Decomposition ########
+    ###############################################
+
+    def svd_calc(self, A):
+        ''' Run SVD algorithms. '''
+
+        AAt = numpy.dot(A, numpy.transpose(A))
+
+        AtA = numpy.dot(numpy.transpose(A), A)
+
+        x1, y1 = numpy.linalg.eigh(AAt)
+        y1 = numpy.transpose(y1)
+        ar = numpy.argsort(x1)
+        ar = numpy.flipud(ar)
+        sx1 = numpy.copy(x1)
+        sy1 = numpy.copy(y1)
+        for i in range(len(ar)):
+            sx1[i] = x1[ar[i]]
+            sy1[i] = y1[ar[i]]
+        u = numpy.transpose(sy1)
+
+        x2, y2 = numpy.linalg.eigh(AtA)
+        y2 = numpy.transpose(y2)
+        ar = numpy.argsort(x2)
+        ar = numpy.flipud(ar)
+        sx2 = numpy.copy(x2)
+        sy2 = numpy.copy(y2)
+        for i in range(len(ar)):
+            sx2[i] = x2[ar[i]]
+            sy2[i] = y2[ar[i]]
+        v = numpy.transpose(sy2)
+        vt = numpy.transpose(v)
+
+        r = round(min(u.shape[1], vt.shape[0]) / 4)
+        for i in range(r):
+            if sx1[i] <= 0:
+                r = i
+                break
+
+        sigma = numpy.zeros((r, r))
+        for i in range(r):
+            sigma[i][i] = sx1[i]
+        sigma = numpy.sqrt(sigma)
+
+        u = u[:, :r]
+        vt = vt[:r, :]
+
+        return u, sigma, vt
+
+    def svd(self):
+        ''' Error calculation and driver method for SVD. '''
+
+        start_time = time.time()
+
+        u, sigma, vt = self.svd_calc(self.transpose_training_ratings_matrix)
+
+        guesses = numpy.dot(u, numpy.dot(sigma, vt))
+
+        for i in range(guesses.shape[0]):
+            for j in range(guesses.shape[1]):
+                guesses[i][j] += self.training_total_mean
+
+        rmse = 0
+        values_tested = 0
+
+        for i in range(400):
+            for j in range(400):
+                if self.transpose_ratings_matrix[i][j] != 0:
+                    values_tested += 1
+                    guess_error = guesses[i][j] - self.transpose_ratings_matrix[i][j]
+                    rmse += guess_error ** 2
+
+        rmse /= values_tested
+        rho = 1 - (6 / (values_tested ** 2 - 1)) * rmse
+        rmse = math.sqrt(rmse)
+
+        t_guesses = numpy.transpose(guesses)
+        precision_at_10 = 0.0
+
+        for i in range(400):
+            top_10 = heapq.nlargest(10, range(400), t_guesses[i].take)
+            for r in top_10:
+                if r >= 3.5:
+                    precision_at_10 += 1
+
+        precision_at_10 /= 4000
+
+        # Add results to GUI
+
+        self.result_string += '90% Energy SVD\t\t'
+
+        self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
+
+        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t\t'
+
+        self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
+
+        self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
+
+
+
+    ###############################################
+
+    ###############################################
     #### Preprocessing Collaborative Filtering ####
     ###############################################
+
+    
 
     def preprocessColab(self):
         ''' Preprocess the data for collaborative filtering. '''
@@ -304,9 +522,9 @@ class RECOMMENDER(tk.Frame):
 
         self.result_string += 'Collaborative\t\t'
 
-        self.result_string += '{0:.3f}'.format(rmse) + '\t\t\t'
+        self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
 
-        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
+        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t\t'
 
         self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
 
@@ -314,230 +532,22 @@ class RECOMMENDER(tk.Frame):
 
         self.result_string += 'Baseline Collaborative\t'
 
-        self.result_string += '{0:.3f}'.format(baseline_rmse) + '\t'
+        self.result_string += '{0:.3f}'.format(baseline_rmse) + '\t\t'
 
-        self.result_string += '{0:.3f}'.format(baseline_precision_at_10 * 100) + '%\t\t'
+        self.result_string += '{0:.3f}'.format(baseline_precision_at_10 * 100) + '%\t\t\t'
 
-        self.result_string += '{0:.6f}'.format(baseline_rho) + '\n\n'
-
-        self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
-
-    ###############################################
-
-
-    ###############################################
-    ######### Singular Value Decomposition ########
-    ###############################################
-
-    def svd_calc(self, A):
-        ''' Run SVD algorithms. '''
-
-        AAt = numpy.dot(A, numpy.transpose(A))
-
-        AtA = numpy.dot(numpy.transpose(A), A)
-
-        x1, y1 = numpy.linalg.eigh(AAt)
-        y1 = numpy.transpose(y1)
-        ar = numpy.argsort(x1)
-        ar = numpy.flipud(ar)
-        sx1 = numpy.copy(x1)
-        sy1 = numpy.copy(y1)
-        for i in range(len(ar)):
-            sx1[i] = x1[ar[i]]
-            sy1[i] = y1[ar[i]]
-        u = numpy.transpose(sy1)
-
-        x2, y2 = numpy.linalg.eigh(AtA)
-        y2 = numpy.transpose(y2)
-        ar = numpy.argsort(x2)
-        ar = numpy.flipud(ar)
-        sx2 = numpy.copy(x2)
-        sy2 = numpy.copy(y2)
-        for i in range(len(ar)):
-            sx2[i] = x2[ar[i]]
-            sy2[i] = y2[ar[i]]
-        v = numpy.transpose(sy2)
-        vt = numpy.transpose(v)
-
-        r = round(min(u.shape[1], vt.shape[0]) / 4)
-        for i in range(r):
-            if sx1[i] <= 0:
-                r = i
-                break
-
-        sigma = numpy.zeros((r, r))
-        for i in range(r):
-            sigma[i][i] = sx1[i]
-        sigma = numpy.sqrt(sigma)
-
-        u = u[:, :r]
-        vt = vt[:r, :]
-
-        return u, sigma, vt
-
-    def svd(self):
-        ''' Error calculation and driver method for SVD. '''
-
-        start_time = time.time()
-
-        u, sigma, vt = self.svd_calc(self.transpose_training_ratings_matrix)
-
-        guesses = numpy.dot(u, numpy.dot(sigma, vt))
-
-        for i in range(guesses.shape[0]):
-            for j in range(guesses.shape[1]):
-                guesses[i][j] += self.training_total_mean
-
-        rmse = 0
-        values_tested = 0
-
-        for i in range(400):
-            for j in range(400):
-                if self.transpose_ratings_matrix[i][j] != 0:
-                    values_tested += 1
-                    guess_error = guesses[i][j] - self.transpose_ratings_matrix[i][j]
-                    rmse += guess_error ** 2
-
-        rmse /= values_tested
-        rho = 1 - (6 / (values_tested ** 2 - 1)) * rmse
-        rmse = math.sqrt(rmse)
-
-        t_guesses = numpy.transpose(guesses)
-        precision_at_10 = 0.0
-
-        for i in range(400):
-            top_10 = heapq.nlargest(10, range(400), t_guesses[i].take)
-            for r in top_10:
-                if r >= 3.5:
-                    precision_at_10 += 1
-
-        precision_at_10 /= 4000
-
-        # Add results to GUI
-
-        self.result_string += '90% Energy SVD\t\t'
-
-        self.result_string += '{0:.3f}'.format(rmse) + '\t\t\t'
-
-        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
-
-        self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
+        self.result_string += '{0:.6f}'.format(baseline_rho) + '\t\t\t'
 
         self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
 
     ###############################################
 
 
-    ###############################################
-    ############## CUR Decomposition ##############
-    ###############################################
 
-    def cur(self):
-        ''' Run CUR Decomposition algorithms. '''
 
-        start_time = time.time()
 
-        A = self.transpose_training_ratings_matrix
 
-        At = numpy.transpose(A)
 
-        row_squares = numpy.zeros((A.shape[0], 1))
-
-        column_squares = numpy.zeros((A.shape[1], 1))
-
-        square_sum = 0
-
-        for i in range(A.shape[0]):
-            for j in range(A.shape[1]):
-                square_sum += A[i][j] ** 2
-                row_squares[i] += A[i][j] ** 2
-                column_squares[j] += A[i][j] ** 2
-
-        row_probs = numpy.zeros((A.shape[0], 1))
-
-        column_probs = numpy.zeros((A.shape[1], 1))
-
-        for i in range(A.shape[0]):
-            row_probs[i] = row_squares[i] / square_sum
-        for i in range(A.shape[1]):
-            column_probs[i] = column_squares[i] / square_sum
-
-        r = 400
-
-        row_sel = numpy.sort(numpy.random.choice(A.shape[0], r, False, row_probs[:, 0]))
-        column_sel = numpy.sort(numpy.random.choice(A.shape[1], r, False, column_probs[:, 0]))
-
-        R = numpy.zeros((r, A.shape[1]))
-        Ct = numpy.zeros((r, A.shape[0]))
-        W = numpy.zeros((r, r))
-
-        row_rq = numpy.sqrt(r * row_probs)
-        column_rq = numpy.sqrt(r * column_probs)
-
-        for i in range(r):
-            R[i] = A[row_sel[i]] / row_rq[row_sel[i]]
-            Ct[i] = At[column_sel[i]] / column_rq[column_sel[i]]
-            for j in range(r):
-                W[i][j] = A[row_sel[i]][column_sel[j]]
-
-        C = numpy.transpose(Ct)
-
-        X, Z, Yt = numpy.linalg.svd(W)
-
-        Y = numpy.transpose(Yt)
-        Xt = numpy.transpose(X)
-        Zinv = numpy.linalg.pinv(numpy.diag(Z))
-
-        U = numpy.dot(Y, numpy.dot(numpy.dot(Zinv, Zinv), Xt))
-
-        guesses = numpy.dot(C, numpy.dot(U, R))
-
-        x = 10
-        z = 300
-
-        for i in range(guesses.shape[0]):
-            for j in range(guesses.shape[1]):
-                guesses[i][j] += self.training_total_mean
-
-        rmse = 0
-        values_tested = 0
-
-        for i in range(400):
-            for j in range(400):
-                if self.transpose_ratings_matrix[i][j] != 0:
-                    values_tested += 1
-                    guess_error = guesses[i][j] - self.transpose_ratings_matrix[i][j]
-                    rmse += guess_error ** 2
-        rmse /= values_tested
-        while rmse > z:
-            rmse /= x
-        rho = 1 - (6 / (values_tested ** 2 - 1)) * rmse
-        rmse = math.sqrt(rmse)
-
-        t_guesses = numpy.transpose(guesses)
-        precision_at_10 = 0.0
-
-        for i in range(400):
-            top_10 = heapq.nlargest(10, range(400), t_guesses[i].take)
-            for r in top_10:
-                if r >= 3.5:
-                    precision_at_10 += 1
-
-        precision_at_10 /= 4000
-
-        # Add results to GUI
-
-        self.result_string += '90% Energy CUR\t\t'
-
-        self.result_string += '{0:.3f}'.format(rmse) + '\t\t\t'
-
-        self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
-
-        self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
-
-        self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
-
-    ###############################################
 
 ###############################################################################
 
