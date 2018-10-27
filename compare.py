@@ -21,7 +21,7 @@ import time
 import tkinter as tk
 
 
-class RecommenderSystems(tk.Frame):
+class RECOMMENDER(tk.Frame):
     '''
     This is the master application defining class and encapsulates
     everything from the GUI widgets to the core search implementation.
@@ -304,7 +304,7 @@ class RecommenderSystems(tk.Frame):
 
         self.result_string += 'Collaborative\t\t'
 
-        self.result_string += '{0:.3f}'.format(rmse) + '\t'
+        self.result_string += '{0:.3f}'.format(rmse) + '\t\t\t'
 
         self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
 
@@ -319,6 +319,8 @@ class RecommenderSystems(tk.Frame):
         self.result_string += '{0:.3f}'.format(baseline_precision_at_10 * 100) + '%\t\t'
 
         self.result_string += '{0:.6f}'.format(baseline_rho) + '\n\n'
+
+        self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
 
     ###############################################
 
@@ -415,7 +417,7 @@ class RecommenderSystems(tk.Frame):
 
         self.result_string += '90% Energy SVD\t\t'
 
-        self.result_string += '{0:.3f}'.format(rmse) + '\t'
+        self.result_string += '{0:.3f}'.format(rmse) + '\t\t\t'
 
         self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
 
@@ -527,7 +529,7 @@ class RecommenderSystems(tk.Frame):
 
         self.result_string += '90% Energy CUR\t\t'
 
-        self.result_string += '{0:.3f}'.format(rmse) + '\t'
+        self.result_string += '{0:.3f}'.format(rmse) + '\t\t\t'
 
         self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t'
 
@@ -539,8 +541,8 @@ class RecommenderSystems(tk.Frame):
 
 ###############################################################################
 
-root = tk.Tk()
-app = RecommenderSystems(root)
-app.master.title('Recommender Systems Comparison')
+gui = tk.Tk()
+app = RECOMMENDER(gui)
+app.master.title('Recommender Algorithms Comparison Table')
 app.after(500, app.loadData)
 app.mainloop()
