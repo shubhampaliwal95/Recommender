@@ -1,0 +1,49 @@
+<h1 id="designdocument">Design Document</h1>
+
+<h4 id="team">Team Members -</h4>
+
+<ul>
+<li>Kushal Agrawal - 2015A3PS0289H</li>
+
+<li>Pranav Asthana - 2015A7PS0961H</li>
+
+<li>Ajinkya Rasane - 2015A7PS0086H</li>
+
+<li>Mansi Pandey - 2015AAPS276H</li>
+</ul>
+
+<h4 id="architecture">Architecture -</h4>
+
+<ul>
+<li>The system consists of a single Python script - compare.py</li>
+
+<li>The script runs as a Tkinter GUI application.</li>
+
+<li>There are three main methods in the class, one for each of the algorithms.</li>
+
+<li>We considered the nearest 100 neighbours in the collaborative filtering algorithm.</li>
+
+<li>We used 400 rows and columns for the CUR decomposition algorithm.</li>
+
+<li>All diagnostic tests were performed on a 400x400 submatrix of the data.</li>
+</ul>
+
+<h4 id="datastructuresused">Data Structures Used -</h4>
+
+<p>The majorly used data structures are:</p>
+
+<ul>
+<li><b>Lists</b> - can be considered linear, random access arrays, used for general purpose storage.</li>
+
+<li><b>Dictionaries</b> - these are implemented in Python as Hash Maps, and so offer fast searching and mapping of information, and hence were very useful in the project.</li>
+
+<li><b>Numpy Matrices</b> - Numpy arrays and matrices provide several linear algebra related functionalities and fast matrix computations.</li>
+</ul>
+
+<h4 id="runningtime">Running Time -</h4>
+
+<ul>
+<li>There is a preprocessing stage for collaborative filtering, where we compute the similarities between all the movies present in the database and for each movie, store on disk the 100 most similar movies to it.</li>
+
+<li>The script then goes on to load all the preprocessed data into memory and organize it into data structures. It sequentially runs the three algorithms and calculates RMSE, Precision on top 10, and Spearman Rank Correlation for all of them. It ends with neatly displaying all the values in a GUI window.</li>
+</ul>
