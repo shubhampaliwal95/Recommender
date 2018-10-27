@@ -119,7 +119,7 @@ class RECOMMENDER(tk.Frame):
     def common(self):
         ''' Perform calculations common to various algorithms '''
 
-        self.result_string += 'Technique\t\t\tRMSE\tPrecision on top 10\tSpearman Rank Correlation\tTime\n\n'
+        self.result_string += 'Technique\t\tRMSE\tPrecision on top 10\tSpearman Rank Correlation\tTime\n\n'
 
         self.transpose_ratings_matrix = numpy.transpose(self.ratings_matrix)
 
