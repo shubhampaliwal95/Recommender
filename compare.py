@@ -99,11 +99,13 @@ class RECOMMENDER(tk.Frame):
 
         self.colab()
 
-        self.svd90()
-        
         self.svd()
+        
+        self.svd90()
 
         self.cur()
+
+        self.cur90()
 
        
 
@@ -167,13 +169,13 @@ class RECOMMENDER(tk.Frame):
                 self.transpose_training_ratings_matrix[i][j] = self.transpose_ratings_matrix[i][j]
 
         self.training_total_mean = self.training_ratings_matrix.mean()
-
+        self.transpose_total_mean=self.transpose_training_ratings_matrix.mean()
         for i in range(self.ratings_matrix.shape[0]):
             for j in range(self.ratings_matrix.shape[1]):
                 if self.training_ratings_matrix[i][j] != 0:
                     self.training_ratings_matrix[i][j] -= self.training_total_mean
                 if self.transpose_training_ratings_matrix[j][i] != 0:
-                    self.transpose_training_ratings_matrix[j][i] -= self.training_total_mean
+                    self.transpose_training_ratings_matrix[j][i] -= self.transpose_total_mean
 
     ###############################################
 
@@ -181,8 +183,112 @@ class RECOMMENDER(tk.Frame):
     ############## CUR Decomposition ##############
     ###############################################
 
-
     def cur(self):
+            ''' Run CUR Decomposition algorithms. '''
+
+            start_time = time.time()
+
+            A = self.transpose_training_ratings_matrix
+
+            At = numpy.transpose(A)
+
+            row_squares = numpy.zeros((A.shape[0], 1))
+
+            column_squares = numpy.zeros((A.shape[1], 1))
+
+            square_sum = 0
+
+            for i in range(A.shape[0]):
+                for j in range(A.shape[1]):
+                    square_sum += A[i][j] ** 2
+                    row_squares[i] += A[i][j] ** 2
+                    column_squares[j] += A[i][j] ** 2
+
+            row_probs = numpy.zeros((A.shape[0], 1))
+
+            column_probs = numpy.zeros((A.shape[1], 1))
+
+            for i in range(A.shape[0]):
+                row_probs[i] = row_squares[i] / square_sum
+            for i in range(A.shape[1]):
+                column_probs[i] = column_squares[i] / square_sum
+
+            r = 400
+
+            row_sel = numpy.sort(numpy.random.choice(A.shape[0], r, False, row_probs[:, 0]))
+            column_sel = numpy.sort(numpy.random.choice(A.shape[1], r, False, column_probs[:, 0]))
+
+            R = numpy.zeros((r, A.shape[1]))
+            Ct = numpy.zeros((r, A.shape[0]))
+            W = numpy.zeros((r, r))
+
+            row_rq = numpy.sqrt(r * row_probs)
+            column_rq = numpy.sqrt(r * column_probs)
+
+            for i in range(r):
+                R[i] = A[row_sel[i]] / row_rq[row_sel[i]]
+                Ct[i] = At[column_sel[i]] / column_rq[column_sel[i]]
+                for j in range(r):
+                    W[i][j] = A[row_sel[i]][column_sel[j]]
+
+            C = numpy.transpose(Ct)
+
+            X, Z, Yt = self.svd_calc(W)
+
+            Y = numpy.transpose(Yt)
+            Xt = numpy.transpose(X)
+            Zinv = numpy.linalg.inv(Z)
+
+            U = numpy.dot(Y, numpy.dot(numpy.dot(Zinv, Zinv), Xt))
+
+            guesses = numpy.dot(C, numpy.dot(U, R))
+
+            x = 10
+            z = 300
+
+            for i in range(guesses.shape[0]):
+                for j in range(guesses.shape[1]):
+                    guesses[i][j] += self.training_total_mean
+
+            rmse = 0
+            values_tested = 0
+
+            for i in range(400):
+                for j in range(400):
+                    if self.transpose_ratings_matrix[i][j] != 0:
+                        values_tested += 1
+                        guess_error = guesses[i][j] - self.transpose_ratings_matrix[i][j]
+                        rmse += guess_error ** 2
+            rmse /= values_tested
+            while rmse > z:
+                rmse /= x
+            rho = 1 - (6 / (values_tested ** 2 - 1)) * rmse
+            rmse = math.sqrt(rmse)
+
+            t_guesses = numpy.transpose(guesses)
+            precision_at_10 = 0.0
+
+            for i in range(400):
+                top_10 = heapq.nlargest(10, range(400), t_guesses[i].take)
+                for r in top_10:
+                    if r >= 3.5:
+                        precision_at_10 += 1
+
+            precision_at_10 /= 4000
+
+            # Add results to GUI
+
+            self.result_string += '100% Energy CUR\t\t'
+
+            self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
+
+            self.result_string += '{0:.3f}'.format(precision_at_10 * 100) + '%\t\t\t'
+
+            self.result_string += '{0:.6f}'.format(rho) + '\t\t\t'
+
+            self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
+
+    def cur90(self):
         ''' Run CUR Decomposition algorithms. '''
 
         start_time = time.time()
@@ -232,11 +338,11 @@ class RECOMMENDER(tk.Frame):
 
         C = numpy.transpose(Ct)
 
-        X, Z, Yt = numpy.linalg.svd(W)
+        X, Z, Yt = self.svd_calc90(W)
 
         Y = numpy.transpose(Yt)
         Xt = numpy.transpose(X)
-        Zinv = numpy.linalg.pinv(numpy.diag(Z))
+        Zinv = numpy.linalg.inv(Z)
 
         U = numpy.dot(Y, numpy.dot(numpy.dot(Zinv, Zinv), Xt))
 
@@ -523,7 +629,7 @@ class RECOMMENDER(tk.Frame):
         for i in range(self.ratings_matrix.shape[0]):
             for j in range(self.ratings_matrix.shape[1]):
                 if self.ratings_matrix[i, j] != 0:
-                    norm_ratings_matrix[i, j] = (self.ratings_matrix[i, j] - self.movie_means[i])
+                    norm_ratings_matrix[i, j] = (self.ratings_matrix[i, j] - self.movie_means[i])       #Handling raters
                     magnitudes[i] += norm_ratings_matrix[i, j] * norm_ratings_matrix[i, j]
             magnitudes[i] = math.sqrt(magnitudes[i])
             for j in range(self.ratings_matrix.shape[1]):
