@@ -1,8 +1,7 @@
 '''
 This script compares three different recommendation algorithms for generation
 of missing/expected movie ratings and displays the results to the user.
-Author: 
-Date of Completion: 
+
 The dataset containing the movie ratings was obtained from www.movielens.org
 and the following paper is responsible for its creation:
 F. Maxwell Harper and Joseph A. Konstan. 2015. The MovieLens Datasets: History
@@ -80,11 +79,12 @@ class RECOMMENDER(tk.Frame):
 
     def loadData(self):
         ''' Load the ratings data and run the algorithms. '''
+        progstart = time.time()
 
         # File with the ratings data
         ratings_file = open('./ratings/ratings.dat', 'r')
 
-        # Dictionary of keys format sparse matrix
+        # Dictionary of keys format sparse matrix, 3952 movies, 6040 users
         self.ratings_matrix = numpy.zeros((3952, 6040))
 
         for rating in ratings_file:
@@ -107,6 +107,9 @@ class RECOMMENDER(tk.Frame):
 
         self.cur90()
 
+        self.result_string += 'Total Time Taken : '
+        self.result_string += '{0:.3f}'.format((time.time() - progstart) / 60) + 'min '+'\n\n'
+
        
 
         self.setMessage(self.result_string)
@@ -122,7 +125,7 @@ class RECOMMENDER(tk.Frame):
     def common(self):
         ''' Perform calculations common to various algorithms '''
 
-        self.result_string += 'Technique\t\tRMSE\tPrecision on top 10\tSpearman Rank Correlation\tTime\n\n'
+        self.result_string += 'Technique\t\tRMSE\t\tPrecision on top 10\t\tSpearman Rank Correlation\tTime\n\n'
 
         self.transpose_ratings_matrix = numpy.transpose(self.ratings_matrix)
 
@@ -278,7 +281,7 @@ class RECOMMENDER(tk.Frame):
 
             # Add results to GUI
 
-            self.result_string += '100% Energy CUR\t\t'
+            self.result_string += '100% Energy CUR\t'
 
             self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
 
@@ -383,7 +386,7 @@ class RECOMMENDER(tk.Frame):
 
         # Add results to GUI
 
-        self.result_string += '90% Energy CUR\t\t'
+        self.result_string += '90% Energy CUR\t'
 
         self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
 
@@ -485,7 +488,7 @@ class RECOMMENDER(tk.Frame):
 
         # Add results to GUI
 
-        self.result_string += '100% Energy SVD\t\t'
+        self.result_string += '100% Energy SVD\t'
 
         self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
 
@@ -525,7 +528,7 @@ class RECOMMENDER(tk.Frame):
         v = numpy.transpose(sy2)
         vt = numpy.transpose(v)
         r = round(min(u.shape[1], vt.shape[0]))
-        net=0;
+        net=0
         for i in range(r):
             if sx1[i] <= 0:
                 r = i
@@ -600,7 +603,7 @@ class RECOMMENDER(tk.Frame):
 
         # Add results to GUI
 
-        self.result_string += '90% Energy SVD\t\t'
+        self.result_string += '90% Energy SVD\t'
 
         self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
 
@@ -743,7 +746,7 @@ class RECOMMENDER(tk.Frame):
 
         # Add results to GUI
 
-        self.result_string += 'Collaborative\t\t'
+        self.result_string += 'Collaborative\t'
 
         self.result_string += '{0:.3f}'.format(rmse) + '\t\t'
 
@@ -753,7 +756,7 @@ class RECOMMENDER(tk.Frame):
 
         self.result_string += '{0:.3f}'.format((time.time() - start_time) / 60) + '\n\n'
 
-        self.result_string += 'Baseline Collaborative\t'
+        self.result_string += 'Baseline Coll.\t'
 
         self.result_string += '{0:.3f}'.format(baseline_rmse) + '\t\t'
 
